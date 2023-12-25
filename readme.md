@@ -4,7 +4,7 @@ Starting with a simple holdem engine in order to build a hand recorder that is s
 
 ## Tasks
 
-[] Basic Holdem Game Engine
-[] UTG Straddle
-[] Out of Sequence Straddling (Mississppi, Button)
-[] Antes BB and Whole Table
+- [] Basic Holdem Game Engine
+- [] UTG Straddle
+- [] Out of Sequence Straddling (Mississppi, Button)
+- [] Antes BB and Whole Table
