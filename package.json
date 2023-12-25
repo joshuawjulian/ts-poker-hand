@@ -1,0 +1,24 @@
+{
+	"devDependencies": {
+		"@swc-node/register": "^1.6.8",
+		"@tsconfig/node21": "^21.0.0",
+		"@tsconfig/recommended": "^1.0.3",
+		"@types/node": "^20.10.2",
+		"@vitest/coverage-v8": "^0.34.6",
+		"typescript": "^5.3.2",
+		"vitest": "^0.34.6"
+	},
+	"name": "ts-poker-hand",
+	"version": "1.0.0",
+	"main": "index.js",
+	"scripts": {
+		"test": "vitest --coverage"
+	},
+	"author": "",
+	"license": "ISC",
+	"description": "",
+	"type": "module",
+	"dependencies": {
+		"zod": "^3.22.4"
+	}
+}
