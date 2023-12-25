@@ -1,4 +1,4 @@
-import { HoldemStateType } from './state.js';
+import { HoldemStateType, PokerRoundsType } from './state.js';
 
 import { Console } from 'console';
 import { Transform } from 'node:stream';
@@ -44,4 +44,34 @@ export const printTable = (state: HoldemStateType) => {
 		printActions.push(blankAction);
 	}
 	console.table(printActions);
+};
+
+export const numberToRound = (roundNumber: number): PokerRoundsType => {
+	switch (roundNumber) {
+		case 0:
+			return 'preflop';
+		case 1:
+			return 'flop';
+		case 2:
+			return 'turn';
+		case 3:
+			return 'river';
+		default:
+			return 'end';
+	}
+};
+
+export const roundToNumber = (roundStr: PokerRoundsType) => {
+	switch (roundStr) {
+		case 'preflop':
+			return 0;
+		case 'flop':
+			return 1;
+		case 'turn':
+			return 2;
+		case 'river':
+			return 3;
+		default:
+			return 4;
+	}
 };
