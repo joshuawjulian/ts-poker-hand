@@ -380,4 +380,6 @@ export const seatWithNextAction = (state: HoldemStateType) => {
   return seatWithNextActionAtIndex(state, state.actionList.length - 1);
 };
 
+printStateTable(preBuiltTestHandOne);
+
 console.log(seatWithNextActionAtIndex(preBuiltTestHandOne, 13));
