@@ -279,7 +279,8 @@ export const seatsAllin = (state: HoldemStateType) => {
   return seatsAllinAtIndex(state, state.actionList.length - 1);
 };
 
-export const seatsWithActionAtIndex = (
+// None folded seats with
+export const seatsWithChipsBehindAtIndex = (
   state: HoldemStateType,
   idx: number,
 ): number[] => {
@@ -308,8 +309,8 @@ export const seatsWithActionAtIndex = (
   return seats;
 };
 
-export const seatsWithAction = (state: HoldemStateType) => {
-  return seatsWithActionAtIndex(state, state.actionList.length - 1);
+export const seatsWithChipsBehind = (state: HoldemStateType) => {
+  return seatsWithChipsBehindAtIndex(state, state.actionList.length - 1);
 };
 
 export const largestAggressiveAction = (
@@ -331,7 +332,7 @@ export const largestAggressiveAction = (
   return largestAggAction;
 };
 
-export const seatsWhoActed = (actions: PlayerActionsType[]) => {
+export const seatsWhoActed = (actions: PlayerActionsType[]): number[] => {
   let seats: number[] = [];
   actions.forEach((action) => {
     if (!seats.includes(action.seat)) seats.push(action.seat);
@@ -344,7 +345,7 @@ export const seatWithNextActionAtIndex = (
   idx: number,
 ): number | PokerRoundsType => {
   const round = whatRoundAtIndex(state, idx);
-  let seats = seatsWithActionAtIndex(state, idx);
+  let seats = seatsWithChipsBehindAtIndex(state, idx);
   const actions = actionsByRoundAtIndex(state, idx)[round];
 
   //Is the index the start of a new round of betting?
@@ -357,10 +358,10 @@ export const seatWithNextActionAtIndex = (
     return seat;
   }
   //Is there an agressive action this round as of the index?
-  const aggAction = largestAggressiveAction(actions);
+  const largAggAction = largestAggressiveAction(actions);
 
   // if no one has acted agressively this round
-  if (aggAction === 'none') {
+  if (largAggAction === 'none') {
     // figure out if everyone acted
     // find the difference
     let diff = arrayDiff(seats, seatsWhoActed(actions));
@@ -372,6 +373,7 @@ export const seatWithNextActionAtIndex = (
     }
   } else {
     // There has been an aggressive action - who still needs to respond to it.
+    let seatRespondingTo = largAggAction.seat;
   }
   return seats[0];
 };
@@ -379,6 +381,18 @@ export const seatWithNextActionAtIndex = (
 export const seatWithNextAction = (state: HoldemStateType) => {
   return seatWithNextActionAtIndex(state, state.actionList.length - 1);
 };
+
+// export const nextActionAtIndex = (
+//   state: HoldemStateType,
+//   idx: number,
+// ): number | PokerRoundsType => {
+//   const round = whatRoundAtIndex(state, idx);
+//   let swa = seatsWithActionAtIndex(state, idx);
+//   const actions = actionsByRoundAtIndex(state, idx)[round];
+
+//   if (swa.length === 1) {
+//   }
+// };
 
 printStateTable(preBuiltTestHandOne);
 
