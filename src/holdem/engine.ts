@@ -280,7 +280,7 @@ export const seatsAllin = (state: HoldemStateType) => {
 };
 
 // None folded seats with
-export const seatsWithChipsBehindAtIndex = (
+export const seatsWithActionAtIndex = (
   state: HoldemStateType,
   idx: number,
 ): number[] => {
@@ -309,8 +309,8 @@ export const seatsWithChipsBehindAtIndex = (
   return seats;
 };
 
-export const seatsWithChipsBehind = (state: HoldemStateType) => {
-  return seatsWithChipsBehindAtIndex(state, state.actionList.length - 1);
+export const seatsWithAction = (state: HoldemStateType) => {
+  return seatsWithActionAtIndex(state, state.actionList.length - 1);
 };
 
 export const largestAggressiveAction = (
@@ -345,7 +345,7 @@ export const seatWithNextActionAtIndex = (
   idx: number,
 ): number | PokerRoundsType => {
   const round = whatRoundAtIndex(state, idx);
-  let seats = seatsWithChipsBehindAtIndex(state, idx);
+  let seats = seatsWithActionAtIndex(state, idx);
   const actions = actionsByRoundAtIndex(state, idx)[round];
 
   //Is the index the start of a new round of betting?
@@ -382,17 +382,38 @@ export const seatWithNextAction = (state: HoldemStateType) => {
   return seatWithNextActionAtIndex(state, state.actionList.length - 1);
 };
 
-// export const nextActionAtIndex = (
-//   state: HoldemStateType,
-//   idx: number,
-// ): number | PokerRoundsType => {
-//   const round = whatRoundAtIndex(state, idx);
-//   let swa = seatsWithActionAtIndex(state, idx);
-//   const actions = actionsByRoundAtIndex(state, idx)[round];
+export type ActionRoundType = {
+  round: PokerRoundsType;
+  action: PlayerActionsType | 'none';
+};
 
-//   if (swa.length === 1) {
-//   }
-// };
+export const seatsLastActionAtIndex = (
+  state: HoldemStateType,
+  idx: number,
+): ActionRoundType[] => {
+  if (idx > state.actionList.length - 1) idx = state.actionList.length - 1;
+  let round: PokerRoundsType = 'preflop';
+  let lastActions: ActionRoundType[] = new Array(state.seats.length).fill({
+    round: 'preflop',
+    action: 'none',
+  });
+  for (let i = 0; i <= idx; i++) {
+    const action = state.actionList[i];
+    if (isPlayerAction(action)) lastActions[action.seat] = { round, action };
+    else round = action.action;
+  }
+  return lastActions;
+};
+
+export const seatsLastAction = (state: HoldemStateType) => {
+  return seatsLastActionAtIndex(state, state.actionList.length - 1);
+};
+
+export const nextActionAtIndex = (state: HoldemStateType, idx: number) => {
+  const round = whatRoundAtIndex(state, idx);
+  let swa = seatsWithActionAtIndex(state, idx);
+  const actions = actionsByRoundAtIndex(state, idx)[round];
+};
 
 printStateTable(preBuiltTestHandOne);
 
