@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import {
   ActionsType,
+  CheckActionOption,
+  FoldActionOption,
+  NextActionOptionType,
+  PlayerActionOptionType,
   PlayerActionsType,
+  betActionOption,
   isDealerAction,
   isPlayerAction,
 } from './action.js';
@@ -409,10 +414,42 @@ export const seatsLastAction = (state: HoldemStateType) => {
   return seatsLastActionAtIndex(state, state.actionList.length - 1);
 };
 
-export const nextActionAtIndex = (state: HoldemStateType, idx: number) => {
+export const nextActionAtIndex = (
+  state: HoldemStateType,
+  idx: number,
+): NextActionOptionType => {
   const round = whatRoundAtIndex(state, idx);
   let swa = seatsWithActionAtIndex(state, idx);
   const actions = actionsByRoundAtIndex(state, idx)[round];
+  const bettableStacks = bettableStackRemainingAtIndex(state, idx);
+
+  //is it the start of a round?
+  if (actions.length === 0) {
+    //is there more than 1 person left to act?
+    if (swa.length > 1) {
+      let betStack = bettableStacks[round][swa[0]];
+      if (betStack === 'unk') betStack = 9999999;
+      return {
+        seat: swa[0],
+        actions: [
+          CheckActionOption,
+          FoldActionOption,
+          betActionOption(0, betStack),
+        ],
+      };
+    } else {
+      // only one person at the start of the round means
+      // that everyone else has folded or is all in
+      return {
+        seat: 'dealer',
+        action: numberToRound(roundToNumber(round) + 1),
+      };
+    }
+  } else {
+    // Round has action already
+    // An agressive action effectively resets the order.
+  }
+  return { seat: swa[0], actions: [] };
 };
 
 printStateTable(preBuiltTestHandOne);
