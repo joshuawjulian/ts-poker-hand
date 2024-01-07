@@ -76,10 +76,14 @@ export const roundToNumber = (roundStr: PokerRoundsType) => {
   }
 };
 
+export const advanceRound = (roundStr: PokerRoundsType) => {
+  return numberToRound(roundToNumber(roundStr) + 1);
+};
+
 export const cycleSeats = (seats: number[]): number[] => {
   if (seats.length < 2) return seats;
   let temp = seats.shift();
-  if (temp) seats.push(temp);
+  if (temp !== undefined) seats.push(temp);
   return seats;
 };
 

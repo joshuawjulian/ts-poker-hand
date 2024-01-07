@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { number, z } from 'zod';
 import {
   ActionsType,
   CheckActionOption,
@@ -15,6 +15,7 @@ import { preBuiltTestHandOne } from './testHands.js';
 
 import {
   actionListSingleLine,
+  advanceRound,
   arrayDiff,
   cycleSeats,
   isNumber,
@@ -23,6 +24,7 @@ import {
   roundToNumber,
 } from './utils.js';
 import { error } from 'console';
+import { emitKeypressEvents } from 'readline';
 
 export type BetOptionType = {
   option: 'bet';
@@ -345,48 +347,6 @@ export const seatsWhoActed = (actions: PlayerActionsType[]): number[] => {
   return seats;
 };
 
-export const seatWithNextActionAtIndex = (
-  state: HoldemStateType,
-  idx: number,
-): number | PokerRoundsType => {
-  const round = whatRoundAtIndex(state, idx);
-  let seats = seatsWithActionAtIndex(state, idx);
-  const actions = actionsByRoundAtIndex(state, idx)[round];
-
-  //Is the index the start of a new round of betting?
-  if (actions.length === 0) {
-    //then we are starting a new round. First player up goes
-    // !TODO everyone is all in and you are just running it out
-    const seat = seats.at(0);
-    if (seat === undefined)
-      throw error('Somehow there is no seats with action');
-    return seat;
-  }
-  //Is there an agressive action this round as of the index?
-  const largAggAction = largestAggressiveAction(actions);
-
-  // if no one has acted agressively this round
-  if (largAggAction === 'none') {
-    // figure out if everyone acted
-    // find the difference
-    let diff = arrayDiff(seats, seatsWhoActed(actions));
-    if (diff.length > 0) {
-      return diff[0];
-    } else {
-      //no aggressive action and everyone has acted, NEXT ROUND
-      return numberToRound(roundToNumber(round) + 1);
-    }
-  } else {
-    // There has been an aggressive action - who still needs to respond to it.
-    let seatRespondingTo = largAggAction.seat;
-  }
-  return seats[0];
-};
-
-export const seatWithNextAction = (state: HoldemStateType) => {
-  return seatWithNextActionAtIndex(state, state.actionList.length - 1);
-};
-
 export type ActionRoundType = {
   round: PokerRoundsType;
   action: PlayerActionsType | 'none';
@@ -414,44 +374,104 @@ export const seatsLastAction = (state: HoldemStateType) => {
   return seatsLastActionAtIndex(state, state.actionList.length - 1);
 };
 
+export const getIndexForRound = (
+  round: string | number,
+  state: HoldemStateType,
+) => {
+  if (typeof round === 'number') round = numberToRound(round);
+
+  return state.actionList.findIndex((ele) => {
+    return isDealerAction(ele) && ele.action === round;
+  });
+};
+
+export const seatsWithActionAtStartOfRound = (
+  state: HoldemStateType,
+  round: string | number,
+): number[] => {
+  if (typeof round === 'number') round = numberToRound(round);
+  let idx = getIndexForRound(round, state);
+  return seatsWithActionAtIndex(state, idx);
+};
+
 export const nextActionAtIndex = (
   state: HoldemStateType,
   idx: number,
 ): NextActionOptionType => {
   const round = whatRoundAtIndex(state, idx);
-  let swa = seatsWithActionAtIndex(state, idx);
-  const actions = actionsByRoundAtIndex(state, idx)[round];
+  let swa = seatsWithActionAtStartOfRound(state, round);
+  const actionsThisRound = actionsByRoundAtIndex(state, idx)[round];
   const bettableStacks = bettableStackRemainingAtIndex(state, idx);
+  const lastActs = seatsLastActionAtIndex(state, idx);
 
-  //is it the start of a round?
-  if (actions.length === 0) {
-    //is there more than 1 person left to act?
-    if (swa.length > 1) {
-      let betStack = bettableStacks[round][swa[0]];
-      if (betStack === 'unk') betStack = 9999999;
-      return {
-        seat: swa[0],
-        actions: [
-          CheckActionOption,
-          FoldActionOption,
-          betActionOption(0, betStack),
-        ],
-      };
-    } else {
-      // only one person at the start of the round means
-      // that everyone else has folded or is all in
-      return {
-        seat: 'dealer',
-        action: numberToRound(roundToNumber(round) + 1),
-      };
+  // find the next seat who would go next
+  actionsThisRound.forEach((action) => {
+    if (isDealerAction(action)) {
+      console.log(`!isPlayerAction(action)`);
+      return;
     }
-  } else {
-    // Round has action already
-    // An agressive action effectively resets the order.
+    if (swa[0] !== action.seat) throw new Error(`${swa[0]} !== ${action.seat}`);
+    if (action.action === 'fold') swa.shift();
+    else swa = cycleSeats(swa);
+  });
+
+  let seat = swa[0];
+  //swa[0] *should* be the next action pending it hasnt already reacted to actions
+  const aggAction = largestAggressiveAction(actionsThisRound);
+  let actions: PlayerActionOptionType[] = [];
+
+  //brand new hand
+  if (idx === -1) {
+    return { seat: 'dealer', action: 'preflop' };
   }
-  return { seat: swa[0], actions: [] };
+  //this means the round is closed out
+  if (
+    (aggAction === 'none' && lastActs[seat].round === round) ||
+    (aggAction !== 'none' &&
+      'seat' in aggAction &&
+      aggAction.action === 'bet' &&
+      aggAction.seat === seat)
+  ) {
+    return { seat: 'dealer', action: advanceRound(round) };
+  }
+
+  let maxStack = bettableStacks[round][seat];
+  if (maxStack === 'unk') {
+    maxStack = 999999;
+  }
+
+  if (aggAction === 'none') {
+    actions.push({ action: 'check' });
+    actions.push({ action: 'bet', min: 1, max: maxStack });
+  } else {
+    actions.push({ action: 'fold' });
+    if ('amount' in aggAction) {
+      let callAmount = aggAction.amount;
+      if (callAmount > maxStack) {
+        callAmount = maxStack;
+        actions.push({ action: 'call', amount: callAmount, isAllIn: true });
+      } else {
+        actions.push({ action: 'call', amount: callAmount, isAllIn: false });
+        actions.push({
+          action: 'bet',
+          max: maxStack,
+          min: callAmount * 2 > maxStack ? maxStack : callAmount * 2,
+        });
+      }
+    }
+  }
+
+  return { seat, actions };
 };
 
 printStateTable(preBuiltTestHandOne);
 
-console.log(seatWithNextActionAtIndex(preBuiltTestHandOne, 13));
+for (let i = 2; i < preBuiltTestHandOne.actionList.length; i++) {
+  console.log(
+    `Action At [${i}] = ${JSON.stringify(preBuiltTestHandOne.actionList[i])}`,
+  );
+  console.log(
+    `Options[${i}] = ${JSON.stringify(nextActionAtIndex(preBuiltTestHandOne, i))}`,
+  );
+  console.log(`--------`);
+}
