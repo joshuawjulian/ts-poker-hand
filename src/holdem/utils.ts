@@ -115,3 +115,15 @@ export const arrayDiff = (arrA: number[], arrB: number[]): number[] => {
 
   return [...new Set(diffArr)];
 };
+
+export const getLargestBlind = (state: HoldemStateType): number => {
+  let largestBlind = 0;
+  state.actionList.forEach((action) => {
+    if (isPlayerAction(action)) {
+      if (action.action === 'blind') {
+        if (action.amount > largestBlind) largestBlind = action.amount;
+      }
+    }
+  });
+  return largestBlind;
+};

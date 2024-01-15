@@ -18,6 +18,7 @@ import {
   advanceRound,
   arrayDiff,
   cycleSeats,
+  getLargestBlind,
   isNumber,
   numberToRound,
   printStateTable,
@@ -25,6 +26,7 @@ import {
 } from './utils.js';
 import { error } from 'console';
 import { emitKeypressEvents } from 'readline';
+import { stat } from 'fs';
 
 export type BetOptionType = {
   option: 'bet';
@@ -320,23 +322,31 @@ export const seatsWithAction = (state: HoldemStateType) => {
   return seatsWithActionAtIndex(state, state.actionList.length - 1);
 };
 
-export const largestAggressiveAction = (
+export const getAllAggActions = (
   actions: PlayerActionsType[],
-): PlayerActionsType | 'none' => {
-  let largestAggAction: PlayerActionsType | 'none' = 'none';
-  actions.forEach((currAction, index) => {
+): PlayerActionsType[] | 'none' => {
+  let aggActions: PlayerActionsType[] = [];
+  actions.forEach((currAction) => {
     if (
       currAction.action === 'bet' ||
       currAction.action === 'blind' ||
       currAction.action === 'straddle'
     ) {
-      largestAggAction = currAction;
-      if (currAction.amount > largestAggAction.amount)
-        largestAggAction = currAction;
+      aggActions.push(currAction);
     }
   });
 
-  return largestAggAction;
+  if (aggActions.length === 0) return 'none';
+
+  return aggActions;
+};
+
+export const largestAggressiveAction = (
+  actions: PlayerActionsType[],
+): PlayerActionsType | 'none' => {
+  const aggActions = getAllAggActions(actions);
+  if (aggActions === 'none') return 'none';
+  return aggActions[aggActions.length - 1];
 };
 
 export const seatsWhoActed = (actions: PlayerActionsType[]): number[] => {
@@ -451,17 +461,141 @@ export const nextActionAtIndex = (
         callAmount = maxStack;
         actions.push({ action: 'call', amount: callAmount, isAllIn: true });
       } else {
+        const allAggActions = getAllAggActions(actionsThisRound);
+        let min = getLargestBlind(state);
+        if (allAggActions === 'none') throw new Error('shouldnt of got here');
+        else if (allAggActions.length > 1) {
+          const agg1 = allAggActions[allAggActions.length - 1];
+          const agg2 = allAggActions[allAggActions.length - 2];
+          if ('amount' in agg1 && 'amount' in agg2) {
+            min = agg1.amount - agg2.amount;
+          }
+        } else if (allAggActions.length === 1) {
+          const agg = allAggActions[0];
+          if ('amount' in agg) min = agg.amount * 2;
+        }
         actions.push({ action: 'call', amount: callAmount, isAllIn: false });
         actions.push({
           action: 'bet',
           max: maxStack,
-          min: callAmount * 2 > maxStack ? maxStack : callAmount * 2,
+          min,
         });
       }
     }
   }
 
   return { seat, actions };
+};
+
+export const nextAction = (state: HoldemStateType): NextActionOptionType => {
+  return nextActionAtIndex(state, state.actionList.length - 1);
+};
+
+export type VerifyType =
+  | {
+      success: true;
+    }
+  | {
+      success: false;
+      reason: string;
+    };
+
+export const verifyAction = (
+  newAction: ActionsType,
+  state: HoldemStateType,
+  idx: number,
+): VerifyType => {
+  const goodActions = nextActionAtIndex(state, idx);
+
+  //check dealer actions first
+  if (isDealerAction(newAction)) {
+    if (goodActions.seat !== 'dealer') {
+      return {
+        success: false,
+        reason: `pushNext() - goodActions.seat === ${goodActions.seat}`,
+      };
+    }
+    if (goodActions.action !== newAction.action) {
+      return {
+        success: false,
+        reason: `pushNext() - goodActions.action !== action.action, ${goodActions.action} !== ${newAction.action}`,
+      };
+    }
+    return { success: true };
+  }
+
+  if (goodActions.seat !== newAction.seat) {
+    return {
+      success: false,
+      reason: `pushNext() - goodActions.seat !== action.seat, ${goodActions.seat} !== ${newAction.seat}`,
+    };
+  }
+  const goodAction = goodActions.actions.find(
+    (act) => act.action === newAction.action,
+  );
+  if (goodAction === undefined)
+    return { success: false, reason: `pushNext() - goodAction === undefined` };
+
+  if (newAction.action === 'fold' || newAction.action === 'check') {
+    return { success: true };
+  } else if (newAction.action === 'call') {
+    if ('amount' in newAction && 'amount' in goodAction) {
+      if (newAction.amount !== goodAction.amount) {
+        return {
+          success: false,
+          reason: `pushNext() - newAction.amount !== goodAction.amount, ${newAction.amount} !== ${goodAction.amount}`,
+        };
+      }
+      if (newAction.isAllIn !== goodAction.isAllIn) {
+        return {
+          success: false,
+          reason: `pushNext() - newAction.isAllIn !== goodAction.isAllIn, ${newAction.isAllIn} !== ${goodAction.isAllIn}`,
+        };
+      }
+    }
+  } else if (newAction.action === 'bet') {
+    if ('amount' in newAction && 'min' in goodAction && 'max' in goodAction) {
+      if (
+        newAction.amount < goodAction.min ||
+        newAction.amount > goodAction.max
+      ) {
+        return {
+          success: false,
+          reason: `pushNext() - newAction.amount < goodAction.min || newAction.amount > goodAction.max, ${newAction.amount} < ${goodAction.min} || ${newAction.amount} > ${goodAction.max}`,
+        };
+      }
+    }
+  }
+  return { success: true };
+};
+
+export const pushNext = (
+  action: PlayerActionsType,
+  state: HoldemStateType,
+): HoldemStateType => {
+  const nextState = { ...state };
+
+  const result = verifyAction(action, state, state.actionList.length - 1);
+
+  if (!result.success) {
+    throw new Error(`pushNext() - ${result.reason}`);
+  }
+
+  // need to set all in flag if bet puts player all in
+  // issue here is sometimes max bet wont be all in (spread limit for example)
+  if (action.action === 'bet') {
+    let bettableStacks = bettableStackRemaining(state);
+    const maxBettableStack = bettableStacks[whatRound(state)][action.seat];
+    if (maxBettableStack === 'unk') {
+      action.isAllIn = false;
+    } else if (action.amount === maxBettableStack) {
+      action.isAllIn = true;
+    }
+  }
+
+  nextState.actionList.push(action);
+
+  return nextState;
 };
 
 printStateTable(preBuiltTestHandOne);
