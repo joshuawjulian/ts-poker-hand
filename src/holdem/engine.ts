@@ -570,7 +570,7 @@ export const verifyAction = (
 };
 
 export const pushNext = (
-  action: PlayerActionsType,
+  action: ActionsType,
   state: HoldemStateType,
 ): HoldemStateType => {
   const nextState = { ...state };

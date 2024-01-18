@@ -3,6 +3,7 @@ import { HoldemStateType, PokerRoundsType } from './state.js';
 import { Console } from 'console';
 import { Transform } from 'node:stream';
 import { ActionsType, isPlayerAction } from './action.js';
+import { CardType } from './card.js';
 
 const ts = new Transform({
   transform(chunk, _, cb) {
@@ -126,4 +127,34 @@ export const getLargestBlind = (state: HoldemStateType): number => {
     }
   });
   return largestBlind;
+};
+
+export const getRandomCard = (): CardType => {
+  const suits = ['h', 'd', 'c', 's'] as const;
+  const ranks = [
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    'T',
+    'J',
+    'Q',
+    'K',
+    'A',
+  ] as const;
+  const suit = suits[Math.floor(Math.random() * suits.length)];
+  const rank = ranks[Math.floor(Math.random() * ranks.length)];
+  return { suit, rank };
+};
+
+export const getRandomIndex = (length: number): number => {
+  return Math.floor(Math.random() * length);
+};
+
+export const getRandBetween = (min: number, max: number): number => {
+  return Math.floor(Math.random() * (max - min + 1) + min);
 };
