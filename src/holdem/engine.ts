@@ -256,6 +256,27 @@ export const actionsByRound = (state: HoldemStateType) => {
   return actionsByRoundAtIndex(state, state.actionList.length - 1);
 };
 
+export const getAllBlindsAndStraddles = (state: HoldemStateType) => {
+  let blinds: number[] = [];
+  state.actionList.forEach((value) => {
+    if (
+      isPlayerAction(value) &&
+      (value.action === 'blind' || value.action === 'straddle')
+    )
+      blinds.push(value.amount);
+  });
+  return blinds.sort();
+};
+
+export const getAllBlinds = (state: HoldemStateType) => {
+  let blinds: number[] = [];
+  state.actionList.forEach((value) => {
+    if (isPlayerAction(value) && value.action === 'blind')
+      blinds.push(value.amount);
+  });
+  return blinds.sort();
+};
+
 export const seatsFoldedAtIndex = (
   state: HoldemStateType,
   idx: number,
@@ -447,17 +468,26 @@ export const nextActionAtIndex = (
 
   let maxStack = bettableStacks[round][seat];
   if (maxStack === 'unk') {
-    maxStack = 999999;
+    //if stack size is unknown use the largest stack we can have known in play
+    maxStack = bettableStacks[round].reduce<number>((acc, curr) => {
+      if (curr === 'unk') return acc;
+      if (curr > acc) return curr;
+      return acc;
+    }, 0);
   }
 
   if (aggAction === 'none') {
     actions.push({ action: 'check' });
-    actions.push({ action: 'bet', min: 1, max: maxStack });
+    actions.push({
+      action: 'bet',
+      min: getLargestBlind(state) || 1,
+      max: maxStack,
+    });
   } else {
     actions.push({ action: 'fold' });
     if ('amount' in aggAction) {
       let callAmount = aggAction.amount;
-      if (callAmount > maxStack) {
+      if (callAmount >= maxStack) {
         callAmount = maxStack;
         actions.push({ action: 'call', amount: callAmount, isAllIn: true });
       } else {
@@ -468,18 +498,29 @@ export const nextActionAtIndex = (
           const agg1 = allAggActions[allAggActions.length - 1];
           const agg2 = allAggActions[allAggActions.length - 2];
           if ('amount' in agg1 && 'amount' in agg2) {
-            min = agg1.amount - agg2.amount;
+            min = agg1.amount - agg2.amount + agg1.amount;
+            console.log(
+              `multiple agg actions [${agg2.amount} - ${agg1.amount}]`,
+            );
           }
         } else if (allAggActions.length === 1) {
           const agg = allAggActions[0];
           if ('amount' in agg) min = agg.amount * 2;
         }
         actions.push({ action: 'call', amount: callAmount, isAllIn: false });
-        actions.push({
-          action: 'bet',
-          max: maxStack,
-          min,
-        });
+        if (min < maxStack) {
+          actions.push({
+            action: 'bet',
+            max: maxStack,
+            min,
+          });
+        } else {
+          actions.push({
+            action: 'bet',
+            max: maxStack,
+            min: maxStack,
+          });
+        }
       }
     }
   }
@@ -597,15 +638,3 @@ export const pushNext = (
 
   return nextState;
 };
-
-printStateTable(preBuiltTestHandOne);
-
-for (let i = 2; i < preBuiltTestHandOne.actionList.length; i++) {
-  console.log(
-    `Action At [${i}] = ${JSON.stringify(preBuiltTestHandOne.actionList[i])}`,
-  );
-  console.log(
-    `Options[${i}] = ${JSON.stringify(nextActionAtIndex(preBuiltTestHandOne, i))}`,
-  );
-  console.log(`--------`);
-}

@@ -1,4 +1,6 @@
+import { nextAction, nextActionAtIndex } from './engine.js';
 import { HoldemStateType } from './state.js';
+import { printStateTable } from './utils.js';
 
 export const preBuiltTestHandOne: HoldemStateType = {
   seats: [
@@ -80,5 +82,200 @@ export const UTGStraddleHand = {
     { action: 'bet', seat: 3, amount: 15, isAllIn: false },
     { action: 'fold', seat: 4 },
     { action: 'call', seat: 5, amount: 15, isAllIn: false },
+  ],
+};
+
+const errorHand1: HoldemStateType = {
+  seats: [
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+  ],
+  actionList: [
+    {
+      action: 'preflop',
+    },
+    {
+      action: 'blind',
+      seat: 0,
+      amount: 1,
+      isAllIn: false,
+    },
+    {
+      action: 'blind',
+      seat: 1,
+      amount: 2,
+      isAllIn: false,
+    },
+    {
+      seat: 2,
+      action: 'bet',
+      amount: 28,
+      isAllIn: false,
+    },
+    {
+      seat: 3,
+      action: 'bet',
+      amount: 133,
+      isAllIn: false,
+    },
+    {
+      seat: 4,
+      action: 'bet',
+      amount: 151,
+      isAllIn: false,
+    },
+    {
+      seat: 5,
+      action: 'fold',
+    },
+    {
+      seat: 0,
+      action: 'call',
+      amount: 151,
+      isAllIn: false,
+    },
+    {
+      seat: 1,
+      action: 'fold',
+    },
+    {
+      seat: 2,
+      action: 'call',
+      amount: 151,
+      isAllIn: false,
+    },
+    {
+      seat: 3,
+      action: 'call',
+      amount: 151,
+      isAllIn: false,
+    },
+    {
+      action: 'flop',
+      cards: [
+        {
+          suit: 'd',
+          rank: 'J',
+        },
+        {
+          suit: 'd',
+          rank: '2',
+        },
+        {
+          suit: 'h',
+          rank: '3',
+        },
+      ],
+    },
+    {
+      seat: 0,
+      action: 'check',
+    },
+    {
+      seat: 2,
+      action: 'check',
+    },
+    {
+      seat: 3,
+      action: 'bet',
+      amount: 31,
+      isAllIn: false,
+    },
+    {
+      seat: 4,
+      action: 'call',
+      amount: 31,
+      isAllIn: false,
+    },
+    {
+      seat: 0,
+      action: 'fold',
+    },
+  ],
+};
+
+export const preflopCallHand: HoldemStateType = {
+  seats: [
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+    {
+      startingStack: 200,
+    },
+  ],
+  actionList: [
+    {
+      action: 'preflop',
+    },
+    {
+      action: 'blind',
+      seat: 0,
+      amount: 1,
+      isAllIn: false,
+    },
+    {
+      action: 'blind',
+      seat: 1,
+      amount: 2,
+      isAllIn: false,
+    },
+    {
+      seat: 2,
+      action: 'call',
+      amount: 2,
+      isAllIn: false,
+    },
+    {
+      seat: 3,
+      action: 'call',
+      amount: 2,
+      isAllIn: false,
+    },
+    {
+      seat: 4,
+      action: 'call',
+      amount: 2,
+      isAllIn: false,
+    },
+    {
+      seat: 5,
+      action: 'call',
+      amount: 2,
+      isAllIn: false,
+    },
+    {
+      seat: 0,
+      action: 'call',
+      amount: 2,
+      isAllIn: false,
+    },
   ],
 };

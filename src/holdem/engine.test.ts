@@ -1,14 +1,15 @@
-import { expect, test } from 'vitest';
+import { expect, test, assert } from 'vitest';
 import { type HoldemStateType, setupBasicHoldemGame } from './state.js';
 import {
   actionsByRound,
   hasSeatActedThisRound,
   largestAggressiveAction,
+  nextAction,
   playerActionsBySeat,
+  seatsLastAction,
   whatRound,
 } from './engine.js';
-import { preBuiltTestHandOne } from './testHands.js';
-import { isPlayerAction } from './action.js';
+import { preBuiltTestHandOne, preflopCallHand } from './testHands.js';
 
 test('hasSeatActedThisRound - 6 max', () => {
   let gameTestOne: HoldemStateType = setupBasicHoldemGame(6, 1, 2);
@@ -38,4 +39,15 @@ test('largestAggressiveAction', () => {
   if (act === 'none') return;
   expect(act.action).toBe('bet');
   expect(act.seat).toBe(2);
+});
+
+test('preflop calling', () => {
+  const hand = preflopCallHand;
+  const nextActions = nextAction(hand);
+  console.log(nextActions);
+  expect(nextActions.seat).to.equal(1);
+  if (!('actions' in nextActions)) {
+    assert(false);
+  }
+  expect(nextActions.actions.length).to.equal(3);
 });

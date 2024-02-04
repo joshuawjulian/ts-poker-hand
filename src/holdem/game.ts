@@ -1,5 +1,10 @@
-import { NextActionOptionType, PlayerActionsType } from './action.js';
-import { nextAction, pushNext } from './engine.js';
+import { s } from 'vitest/dist/reporters-5f784f42.js';
+import {
+  NextActionOptionType,
+  PlayerActionsType,
+  isPlayerAction,
+} from './action.js';
+import { getAllBlinds, nextAction, pushNext } from './engine.js';
 import { HoldemStateType, setupBasicHoldemGame } from './state.js';
 import {
   getRandBetween,
@@ -8,11 +13,14 @@ import {
   printStateTable,
 } from './utils.js';
 
+import readline from 'readline';
+import fs from 'fs';
+
 const isEnd = (nextAction: NextActionOptionType): boolean => {
   return 'action' in nextAction && nextAction.action === 'end';
 };
 
-const createHand = (
+export const createHand = (
   small: number,
   large: number,
   seats: number,
@@ -41,7 +49,7 @@ const createHand = (
       } else {
         pushNext({ action: 'end' }, state);
       }
-    } else if ('actions' in nextActions && nextActions.actions.length > 0) {
+    } else if (nextActions.actions.length > 0) {
       //is player action
 
       let nextAction =
@@ -75,11 +83,87 @@ const createHand = (
           action: nextAction.action,
         };
       }
-      pushNext(action, state);
+      try {
+        pushNext(action, state);
+      } catch (err) {
+        console.error(err);
+        console.error(`### ERRORED AT ###`);
+        console.error(`Attempted -> ${action}`);
+        console.error(`State -> ${JSON.stringify(state, null, 2)}`);
+      }
     }
   }
 
   return state;
 };
 
-printStateTable(createHand(1, 2, 7));
+// !TODO: Implement the playHand function
+export const playHand = (small: number, large: number, seats: number) => {
+  let state = setupBasicHoldemGame(seats, small, large);
+  for (
+    let nextActions: NextActionOptionType = nextAction(state);
+    !isEnd(nextActions);
+    nextActions = nextAction(state)
+  ) {
+    if ('action' in nextActions) {
+      if (nextActions.action === 'flop') {
+        state = pushNext(
+          {
+            action: 'flop',
+            cards: [getRandomCard(), getRandomCard(), getRandomCard()],
+          },
+          state,
+        );
+      } else if (nextActions.action === 'turn') {
+        state = pushNext({ action: 'turn', card: getRandomCard() }, state);
+      } else if (nextActions.action === 'river') {
+        state = pushNext({ action: 'river', card: getRandomCard() }, state);
+      } else {
+        state = pushNext({ action: 'end' }, state);
+      }
+    } else {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+      console.log('Action on: ', nextActions.seat);
+      let actionList = nextActions.actions.reduce<string[]>((acc, action) => {
+        if ('action' in action) acc.push(action.action);
+        return acc;
+      }, new Array<string>());
+      console.log('Actions: ', actionList);
+      rl.question(`Actions: ${actionList}`, (answer) => {
+        if (!actionList.includes(answer)) {
+          return;
+        } else {
+          console.log('You selected: ', answer);
+        }
+      });
+    }
+  }
+};
+
+const writeHandState = (state: HoldemStateType) => {
+  let seats = state.seats.length;
+  let blinds = getAllBlinds(state).reduce((acc, blind) => {
+    return acc + '_' + blind;
+  }, '');
+  let folder = `./testHands/`;
+  let fileName = `${folder}hand${blinds}_${seats}.json`;
+  fs.writeFile(fileName, JSON.stringify(state), { mode: 'w+' }, (err) => {
+    if (err) {
+      console.error(err);
+      return;
+    }
+  });
+};
+
+const main = () => {
+  let small = 1;
+  let big = 2;
+  let seats = 6;
+  let state = createHand(small, big, seats);
+  printStateTable(state);
+};
+
+main();
