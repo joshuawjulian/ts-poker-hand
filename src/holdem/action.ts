@@ -23,6 +23,12 @@ export const PlayerActionsSchema = z.discriminatedUnion('action', [
 		seat: z.number(),
 		action: z.literal('check'),
 	}),
+	z.object({
+		seat: z.number(),
+		action: z.literal('blind'),
+		amount: z.number(),
+		isAllIn: z.boolean(),
+	}),
 ]);
 
 export const DealerActionSchema = z.discriminatedUnion('action', [
