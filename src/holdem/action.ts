@@ -58,3 +58,62 @@ export const ActionSchema = z.discriminatedUnion('action', [
 ]);
 
 export type ActionType = z.infer<typeof ActionSchema>;
+
+export const PlayerOptionSchema = z.discriminatedUnion('action', [
+	z.object({
+		seat: z.number(),
+		action: z.literal('fold'),
+	}),
+	z.object({
+		seat: z.number(),
+		action: z.literal('call'),
+		amount: z.number(),
+		isAllIn: z.boolean(),
+	}),
+	z.object({
+		seat: z.number(),
+		action: z.literal('bet'),
+		min: z.number(),
+		max: z.number(),
+		isAllIn: z.boolean(),
+	}),
+	z.object({
+		seat: z.number(),
+		action: z.literal('check'),
+	}),
+]);
+
+export const DealerOptionSchema = z.discriminatedUnion('action', [
+	z.object({
+		action: z.literal('deal'),
+	}),
+	z.object({
+		action: z.literal('flop'),
+	}),
+	z.object({
+		action: z.literal('turn'),
+	}),
+	z.object({
+		action: z.literal('river'),
+	}),
+	z.object({
+		action: z.literal('showdown'),
+	}),
+]);
+
+export const OptionSchema = z.discriminatedUnion('action', [
+	...PlayerOptionSchema.options,
+	...DealerOptionSchema.options,
+]);
+
+export const isPlayerAction = (
+	action: ActionType,
+): action is z.infer<typeof PlayerActionsSchema> => {
+	return PlayerActionsSchema.safeParse(action).success;
+};
+
+export const isDealerAction = (
+	action: ActionType,
+): action is z.infer<typeof DealerActionSchema> => {
+	return DealerActionSchema.safeParse(action).success;
+};
