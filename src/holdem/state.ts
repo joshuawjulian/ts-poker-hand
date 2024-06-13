@@ -188,6 +188,28 @@ export const nextSeat = (seats: number[]): number[] => {
 	return updatedSeats;
 };
 
+export type RoundIndiciesType = {
+	[round in PokerRoundType]: number;
+};
+
+export let getRoundIndicies = (state: GameStateType): RoundIndiciesType => {
+	let roundIndicies: RoundIndiciesType = {
+		preflop: -1,
+		flop: -1,
+		turn: -1,
+		river: -1,
+	};
+
+	for (let i = state.actionList.length - 1; i >= 0; i--) {
+		let currAction = state.actionList[i];
+		if (isDealerAction(currAction)) {
+			roundIndicies[currAction.action as PokerRoundType] = i;
+		}
+	}
+
+	return roundIndicies;
+};
+
 export const toString = (state: GameStateType): string => {
 	let str = '';
 	for (let i = 0; i < state.actionList.length; i++) {

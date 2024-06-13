@@ -3,6 +3,7 @@ import {
 	PlayerActionType,
 	PlayerIncreaseWagerType,
 	PokerRoundType,
+	PokerRounds,
 	isDealerAction,
 	isPlayerAction,
 } from './action';
@@ -85,6 +86,80 @@ export let getSeatsAtRoundStart = (
 export let cycleSeats = (seats: number[]): number[] => {
 	if (seats.length > 1) return [...seats.slice(1), seats[0]];
 	return seats;
+};
+
+export let findLargestBlind = (state: GameStateType): number => {
+	return state.actionList.reduce((acc, curr) => {
+		if (curr.action === 'blind' && curr.amount > acc) return curr.amount;
+		return acc;
+	}, 0);
+};
+
+// { PokerRound : [largest wager by seat index]}
+export type LargestWagersType = Record<PokerRoundType, number[]>;
+
+// This can be calls or allins just largest by seat per round
+export let largestWagersByRound = (
+	state: GameStateType,
+): Record<PokerRoundType, number[]> => {
+	let emptyWager = [...Array(state.players.length).keys()].map(() => 0);
+	let wagers = {
+		preflop: [...emptyWager],
+		flop: [...emptyWager],
+		turn: [...emptyWager],
+		river: [...emptyWager],
+	} as Record<PokerRoundType, number[]>;
+
+	let currRound: PokerRoundType;
+	state.actionList.forEach((action, idx) => {
+		if (isDealerAction(action)) {
+			currRound = action.action as PokerRoundType;
+			return;
+		}
+		if (isPlayerAction(action)) {
+			if (
+				'amount' in action &&
+				wagers[currRound][action.seat] < action.amount
+			) {
+				wagers[currRound][action.seat] = action.amount;
+			}
+		}
+	});
+
+	return wagers;
+};
+
+// { PokerRound : [remaining stack at start of round by type]}
+export type StacksAtRoundType = Record<PokerRoundType, number[]>;
+
+export let stacksAtStartOfRound = (state: GameStateType): StacksAtRoundType => {
+	let startingStacks: (number | 'unknown')[] = [];
+	state.players.forEach((player) => {
+		startingStacks.push(player.startingStack);
+	});
+
+	let stacks = {
+		preflop: [...startingStacks],
+		flop: [...startingStacks],
+		turn: [...startingStacks],
+		river: [...startingStacks],
+	} as StacksAtRoundType;
+
+	let largestWagers = largestWagersByRound(state);
+
+	PokerRounds.forEach((round: PokerRoundType, idx) => {
+		let numPlayers = state.players.length;
+		for (let seat = 0; seat < numPlayers; seat++) {
+			if (round === 'preflop') {
+				stacks[round][seat] -= largestWagers[round][seat];
+				continue;
+			}
+			let prevRound = PokerRounds[idx - 1];
+			let prev = stacks[prevRound][seat];
+			stacks[round][seat] = prev - largestWagers[round][seat];
+		}
+	});
+	return stacks;
 };
 
 // !TODO: if bet all in was made prior, and what the min bet actually is

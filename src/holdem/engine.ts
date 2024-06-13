@@ -6,13 +6,14 @@ import {
 } from './action';
 import {
 	cycleSeats,
+	findLargestBlind,
 	getSeatsAtThisRoundStart,
 	playerActionsCurrentRound,
 } from './engineUtils';
 import { GameStateSchema, GameStateType, getCurrentRound } from './state';
 
 // Attempt to work this through comments
-export let nextImproved = (state: GameStateType): NextOptionType[] => {
+export let next = (state: GameStateType): NextOptionType[] => {
 	let optionList: NextOptionType[] = [];
 	// Check state first
 	const parse = GameStateSchema.safeParse(state);
@@ -57,6 +58,19 @@ export let nextImproved = (state: GameStateType): NextOptionType[] => {
 		}
 		seatsOrder = cycleSeats(seatsOrder);
 	}
+
+	let currSeat = seatsOrder[0];
+
+	// always have the option to fold
+	optionList.push({ action: 'fold', seat: currSeat });
+
+	// is checking an option? Only if the action hasnt been opened this round
+	if (wagers.length === 0) {
+		optionList.push({ action: 'check', seat: currSeat });
+	}
+
+	// find the smallest bet we can make
+	let largestBlind = findLargestBlind(state);
 
 	return optionList;
 };
