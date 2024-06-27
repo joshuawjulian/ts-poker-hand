@@ -1,16 +1,16 @@
+import { NextOptionType, PlayerActionType } from './action';
 import {
-	NextOptionType,
-	PlayerActionType,
-	PlayerIncreaseWagerType,
-	increaseWagerAction,
-} from './action';
-import {
-	cycleSeats,
-	findLargestBlind,
-	getSeatsAtThisRoundStart,
+	getCurrentRound,
+	getLargestWagerAmount,
+	getMinMaxBet,
+	getSeatOrder,
+	getWagers,
+	hasNonBlindAction,
+	hasNonBlindStraddleAction,
 	playerActionsCurrentRound,
+	remainingStacks,
 } from './engineUtils';
-import { GameStateSchema, GameStateType, getCurrentRound } from './state';
+import { GameStateSchema, GameStateType } from './state';
 
 // Attempt to work this through comments
 export let next = (state: GameStateType): NextOptionType[] => {
@@ -39,38 +39,65 @@ export let next = (state: GameStateType): NextOptionType[] => {
 	// get the player actions this round
 	let playerActions: PlayerActionType[] = playerActionsCurrentRound(state);
 
-	let seatsOrder = getSeatsAtThisRoundStart(state);
+	let seatOrder = getSeatOrder(state);
+	let wagers = getWagers(state);
+	let currSeat = seatOrder[0];
+	let remainingStack = remainingStacks(state)[currSeat];
+	let [minBet, maxBet] = getMinMaxBet(state);
 
-	// walk through the player actions this round to
-	// to confirm action, see if we need to remove a seat
-	// and figure out what wagers (if any) have been made
-	let wagers: PlayerIncreaseWagerType[] = [];
-	for (let i = 0; i < playerActions.length; i++) {
-		let action = playerActions[i];
-		if (increaseWagerAction(action)) wagers.push(action);
-		if (action.action === 'fold') {
-			seatsOrder = seatsOrder.filter((seat) => seat !== action.seat);
-			continue;
-		}
-		if ('isAllIn' in action && action.isAllIn) {
-			seatsOrder = seatsOrder.filter((seat) => seat !== action.seat);
-			continue;
-		}
-		seatsOrder = cycleSeats(seatsOrder);
+	// early edge cases
+	if (state.actionList.length === 1) {
+		optionList.push({ action: 'blind', seat: currSeat });
+		return optionList;
 	}
 
-	let currSeat = seatsOrder[0];
-
+	// Start compiling options
 	// always have the option to fold
 	optionList.push({ action: 'fold', seat: currSeat });
 
 	// is checking an option? Only if the action hasnt been opened this round
 	if (wagers.length === 0) {
 		optionList.push({ action: 'check', seat: currSeat });
+		optionList.push({
+			action: 'bet',
+			seat: currSeat,
+			min: minBet,
+			max: maxBet,
+		});
 	}
 
-	// find the smallest bet we can make
-	let largestBlind = findLargestBlind(state);
+	if (wagers.length > 0) {
+		let largestWager = getLargestWagerAmount(state);
+
+		// call option
+		if (remainingStack !== 'unknown' && largestWager >= remainingStack) {
+			optionList.push({
+				action: 'call',
+				seat: currSeat,
+				amount: remainingStack,
+				isAllIn: true,
+			});
+		} else {
+			optionList.push({
+				action: 'call',
+				seat: currSeat,
+				amount: largestWager,
+				isAllIn: false,
+			});
+		}
+
+		// !TODO: reopen option
+	}
+
+	//blind/straddle edge case
+	if (currentRound === 'preflop') {
+		if (!hasNonBlindAction(state)) {
+			optionList.push({ action: 'blind', seat: currSeat });
+			optionList.push({ action: 'straddle', seat: currSeat });
+		} else if (!hasNonBlindStraddleAction(state)) {
+			optionList.push({ action: 'straddle', seat: currSeat });
+		}
+	}
 
 	return optionList;
 };

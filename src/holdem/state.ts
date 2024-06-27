@@ -1,11 +1,8 @@
 import { z } from 'zod';
 import {
 	ActionSchema,
-	DealerOptionType,
-	PlayerActionType,
 	PokerRoundType,
 	PokerRounds,
-	increaseWagerAction,
 	isDealerAction,
 } from './action';
 import { CardSchema } from './card';
@@ -16,12 +13,18 @@ export const OptionsSchema = z.object({
 
 export type OptionsType = z.infer<typeof OptionsSchema>;
 
+export const StackSchema = z.union([
+	z.number().positive(),
+	z.literal('unknown'),
+]);
+export type StackType = z.infer<typeof StackSchema>;
+
 export const GameStateSchema = z.object({
 	options: OptionsSchema.default({}),
 	actionList: ActionSchema.array(),
 	players: z
 		.object({
-			startingStack: z.union([z.number().positive(), z.literal('unknown')]),
+			startingStack: StackSchema,
 			cards: CardSchema.array().length(2),
 		})
 		.array()
@@ -40,90 +43,90 @@ export const stateAtIndex = (
 	return newState;
 };
 
-export type ActionByRoundSeatType = Record<
-	(typeof PokerRounds)[number],
-	Record<number, PlayerActionType[]>
->;
-export const getActionByRoundSeat = (
-	state: GameStateType,
-): ActionByRoundSeatType => {
-	const actionByRound = getActionByRound(state);
-	const actionBySeatByRound: ActionByRoundSeatType =
-		{} as ActionByRoundSeatType;
-	for (let round of PokerRounds) {
-		actionBySeatByRound[round] = {} as Record<number, PlayerActionType[]>;
-		for (let seat = 0; seat < state.players.length; seat++) {
-			actionBySeatByRound[round][seat] = actionByRound[round].filter(
-				(action) => action.seat === seat,
-			);
-		}
-	}
-	return actionBySeatByRound;
-};
+// export type ActionByRoundSeatType = Record<
+// 	(typeof PokerRounds)[number],
+// 	Record<number, PlayerActionType[]>
+// >;
+// export const getActionByRoundSeat = (
+// 	state: GameStateType,
+// ): ActionByRoundSeatType => {
+// 	const actionByRound = getActionByRound(state);
+// 	const actionBySeatByRound: ActionByRoundSeatType =
+// 		{} as ActionByRoundSeatType;
+// 	for (let round of PokerRounds) {
+// 		actionBySeatByRound[round] = {} as Record<number, PlayerActionType[]>;
+// 		for (let seat = 0; seat < state.players.length; seat++) {
+// 			actionBySeatByRound[round][seat] = actionByRound[round].filter(
+// 				(action) => action.seat === seat,
+// 			);
+// 		}
+// 	}
+// 	return actionBySeatByRound;
+// };
 
-export type ActionBySeatRoundType = Record<
-	number,
-	Record<(typeof PokerRounds)[number], PlayerActionType[]>
->;
-export const getActionBySeatRound = (
-	state: GameStateType,
-): ActionBySeatRoundType => {
-	const actionByRound = getActionByRound(state);
-	const actionBySeatByRound: ActionBySeatRoundType =
-		{} as ActionBySeatRoundType;
-	for (let seat = 0; seat < state.players.length; seat++) {
-		actionBySeatByRound[seat] = {} as Record<
-			(typeof PokerRounds)[number],
-			PlayerActionType[]
-		>;
-		for (let round of PokerRounds) {
-			actionBySeatByRound[seat][round] = actionByRound[round].filter(
-				(action) => action.seat === seat,
-			);
-		}
-	}
-	return actionBySeatByRound;
-};
+// export type ActionBySeatRoundType = Record<
+// 	number,
+// 	Record<(typeof PokerRounds)[number], PlayerActionType[]>
+// >;
+// export const getActionBySeatRound = (
+// 	state: GameStateType,
+// ): ActionBySeatRoundType => {
+// 	const actionByRound = getActionByRound(state);
+// 	const actionBySeatByRound: ActionBySeatRoundType =
+// 		{} as ActionBySeatRoundType;
+// 	for (let seat = 0; seat < state.players.length; seat++) {
+// 		actionBySeatByRound[seat] = {} as Record<
+// 			(typeof PokerRounds)[number],
+// 			PlayerActionType[]
+// 		>;
+// 		for (let round of PokerRounds) {
+// 			actionBySeatByRound[seat][round] = actionByRound[round].filter(
+// 				(action) => action.seat === seat,
+// 			);
+// 		}
+// 	}
+// 	return actionBySeatByRound;
+// };
 
-export const getNextDealerOption = (state: GameStateType): DealerOptionType => {
-	const roundIndexes = getRoundIndexes(state);
-	const nextRound = PokerRounds.find((round) => roundIndexes[round] === -1);
-	if (nextRound === undefined) return { action: 'showdown' };
-	if (nextRound === 'flop') return { action: 'flop', cards: 3 };
-	if (nextRound === 'turn') return { action: 'turn', cards: 1 };
-	if (nextRound === 'river') return { action: 'river', cards: 1 };
-	return { action: 'preflop' };
-};
+// export const getNextDealerOption = (state: GameStateType): DealerOptionType => {
+// 	const roundIndexes = getRoundIndexes(state);
+// 	const nextRound = PokerRounds.find((round) => roundIndexes[round] === -1);
+// 	if (nextRound === undefined) return { action: 'showdown' };
+// 	if (nextRound === 'flop') return { action: 'flop', cards: 3 };
+// 	if (nextRound === 'turn') return { action: 'turn', cards: 1 };
+// 	if (nextRound === 'river') return { action: 'river', cards: 1 };
+// 	return { action: 'preflop' };
+// };
 
-export const getCurrentRound = (state: GameStateType): PokerRoundType => {
-	const roundIndexes = getRoundIndexes(state);
-	let currentRound: PokerRoundType | undefined;
-	PokerRounds.forEach((round) => {
-		if (roundIndexes[round] !== -1) {
-			currentRound = round;
-		}
-	});
-	if (currentRound === undefined) return 'preflop';
-	return currentRound;
-};
+// export const getCurrentRound = (state: GameStateType): PokerRoundType => {
+// 	const roundIndexes = getRoundIndicies(state);
+// 	let currentRound: PokerRoundType | undefined;
+// 	PokerRounds.forEach((round) => {
+// 		if (roundIndexes[round] !== -1) {
+// 			currentRound = round;
+// 		}
+// 	});
+// 	if (currentRound === undefined) return 'preflop';
+// 	return currentRound;
+// };
 
-export const largestWagerByRound = (
-	state: GameStateType,
-): Record<PokerRoundType, number> => {
-	const actionByRound = getActionByRound(state);
-	const largestWagerByRound: Record<PokerRoundType, number> = {} as Record<
-		PokerRoundType,
-		number
-	>;
-	for (let round of PokerRounds) {
-		const wagers = actionByRound[round]
-			.filter(increaseWagerAction)
-			.map((action) => action.amount);
+// export const largestWagerByRound = (
+// 	state: GameStateType,
+// ): Record<PokerRoundType, number> => {
+// 	const actionByRound = getActionByRound(state);
+// 	const largestWagerByRound: Record<PokerRoundType, number> = {} as Record<
+// 		PokerRoundType,
+// 		number
+// 	>;
+// 	for (let round of PokerRounds) {
+// 		const wagers = actionByRound[round]
+// 			.filter(increaseWagerAction)
+// 			.map((action) => action.amount);
 
-		largestWagerByRound[round] = Math.max(...wagers, 0);
-	}
-	return largestWagerByRound;
-};
+// 		largestWagerByRound[round] = Math.max(...wagers, 0);
+// 	}
+// 	return largestWagerByRound;
+// };
 
 export type WageredEachRoundType = Record<
 	number,

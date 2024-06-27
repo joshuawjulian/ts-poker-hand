@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { GameStateSchema, GameStateType, remainingStackSize } from './state';
+import { GameStateSchema, GameStateType, remainingStackSize } from '../state';
 
 export const gameStateSimpleSetup: GameStateType = {
 	options: {
-		fullRaiseToReopen: true,
+		reopenPercent: 1.0,
 	},
 	players: [
 		{
@@ -84,7 +84,7 @@ export const gameStateSimpleSetup: GameStateType = {
 export const emptyHeadsUp: GameStateType = {
 	actionList: [],
 	options: {
-		fullRaiseToReopen: true,
+		reopenPercent: 1.0,
 	},
 	players: [
 		{
@@ -107,7 +107,7 @@ export const emptyHeadsUp: GameStateType = {
 export const emptySixHanded: GameStateType = {
 	actionList: [],
 	options: {
-		fullRaiseToReopen: true,
+		reopenPercent: 1.0,
 	},
 	players: [
 		{
@@ -159,7 +159,7 @@ describe('GameStateType', () => {
 	it('should be a valid type', () => {
 		const state: GameStateType = {
 			options: {
-				fullRaiseToReopen: true,
+				reopenPercent: 1.0,
 			},
 			actionList: [],
 			players: [
