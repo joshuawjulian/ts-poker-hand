@@ -1,11 +1,15 @@
 import { z } from 'zod';
 import {
 	ActionSchema,
+	PlayerBetType,
+	PlayerBlindType,
+	PlayerStraddleType,
 	PokerRoundType,
 	PokerRounds,
 	isDealerAction,
 } from './action';
 import { CardSchema } from './card';
+import { getWagers } from './engineUtils';
 
 export const OptionsSchema = z.object({
 	reopenPercent: z.number().default(1.0),
@@ -241,4 +245,28 @@ export let actionListToString = (state: GameStateType): string => {
 		str += ` | `;
 	}
 	return str;
+};
+
+export let getBets = (state: GameStateType): PlayerBetType[] => {
+	let wagers = getWagers(state);
+	let bets: PlayerBetType[] = [];
+	wagers.forEach((action) => {
+		if (action.action === 'bet') {
+			bets.push(action);
+		}
+	});
+	return bets;
+};
+
+export let getBlindsStraddles = (
+	state: GameStateType,
+): (PlayerStraddleType | PlayerBlindType)[] => {
+	let wagers = getWagers(state);
+	let blindsStraddles: (PlayerStraddleType | PlayerBlindType)[] = [];
+	wagers.forEach((action) => {
+		if (action.action === 'blind' || action.action === 'straddle') {
+			blindsStraddles.push(action);
+		}
+	});
+	return blindsStraddles;
 };

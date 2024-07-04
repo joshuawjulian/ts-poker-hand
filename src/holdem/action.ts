@@ -199,14 +199,38 @@ export const isDealerAction = (
 	return DealerActionSchema.safeParse(action).success;
 };
 
-export const isPlayerOption = (
-	action: NextOptionType,
-): action is PlayerOptionType => {
-	return PlayerActionsSchema.safeParse(action).success;
+export let isPlayerOption = (
+	option: NextOptionType,
+): option is PlayerOptionType => {
+	return PlayerOptionSchema.safeParse(option).success;
 };
 
-export const isDealerOption = (
-	action: NextOptionType,
-): action is DealerOptionType => {
-	return DealerActionSchema.safeParse(action).success;
+export let isPlayerOptions = (
+	options: NextOptionType[],
+): options is PlayerOptionType[] => {
+	return z.array(PlayerOptionSchema).safeParse(options).success;
+};
+
+export let isDealerOption = (
+	option: NextOptionType,
+): option is DealerOptionType => {
+	return DealerOptionSchema.safeParse(option).success;
+};
+
+export let isDealerOptions = (
+	options: NextOptionType[],
+): options is DealerOptionType[] => {
+	return z.array(DealerOptionSchema).safeParse(options).success;
+};
+
+export let getNextRoundOption = (round: PokerRoundType): DealerOptionType => {
+	if (round === 'preflop') {
+		return { action: 'flop', cards: 3 };
+	} else if (round === 'flop') {
+		return { action: 'turn', cards: 1 };
+	} else if (round === 'turn') {
+		return { action: 'river', cards: 1 };
+	} else {
+		return { action: 'showdown' };
+	}
 };

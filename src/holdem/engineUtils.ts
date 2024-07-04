@@ -1,14 +1,20 @@
 import {
+	ActionType,
 	DealerActionType,
 	PlayerActionType,
+	PlayerBetType,
 	PlayerIncreaseWagerType,
 	PokerRoundType,
 	PokerRounds,
 	increaseWagerAction,
 	isDealerAction,
+	isDealerOptions,
 	isPlayerAction,
+	isPlayerOptions,
 } from './action';
-import { GameStateType, StackType } from './state';
+import { next } from './engine';
+import { GameStateType, StackType, getBets, getBlindsStraddles } from './state';
+import { optionArrayToString } from './tests/testUtil';
 
 export let playerActionsCurrentRound = (
 	state: GameStateType,
@@ -72,7 +78,7 @@ export let getSeatsAtRoundStart = (
 	let seats: number[] = [...Array(state.players.length).keys()];
 	let idxRoundStart = getIndexOfRoundStart(state, round);
 
-	for (let i = idxRoundStart; i < state.actionList.length; i++) {
+	for (let i = 0; i < idxRoundStart; i++) {
 		let action = state.actionList[i];
 		if (
 			isPlayerAction(action) &&
@@ -142,30 +148,29 @@ export let getStacksAtStartOfRound = (
 	});
 
 	let stacks = {
-		preflop: [...startingStacks],
-		flop: [...startingStacks],
-		turn: [...startingStacks],
-		river: [...startingStacks],
+		preflop: structuredClone(startingStacks),
+		flop: structuredClone(startingStacks),
+		turn: structuredClone(startingStacks),
+		river: structuredClone(startingStacks),
 	} as StacksAtRoundType;
 
 	let largestWagers = largestWagersByRound(state);
 
-	PokerRounds.forEach((round: PokerRoundType, idx) => {
-		let numPlayers = state.players.length;
-		for (let seat = 0; seat < numPlayers; seat++) {
-			let currStack = stacks[round][seat];
-			if (currStack !== 'unknown') {
-				if (round === 'preflop') {
-					stacks[round][seat] = currStack - largestWagers[round][seat];
-					continue;
-				}
-				let prevRound = PokerRounds[idx - 1];
-				let prev = stacks[prevRound][seat];
-				if (prev !== 'unknown')
-					stacks[round][seat] = prev - largestWagers[round][seat];
+	// go through each seat and by round get the largest wager additing it
+	// to the seatTotal then subtracting it from the starting stack
+	for (let seat = 0; seat < state.players.length; seat++) {
+		let seatTotal = 0;
+		PokerRounds.forEach((round: PokerRoundType) => {
+			let startingStack = stacks['preflop'][seat];
+			if (startingStack === 'unknown') return;
+			if (round === 'preflop') {
+				seatTotal = largestWagers[round][seat];
+				return;
 			}
-		}
-	});
+			stacks[round][seat] = startingStack - seatTotal;
+			seatTotal += largestWagers[round][seat];
+		});
+	}
 	return stacks;
 };
 
@@ -236,16 +241,22 @@ export let getLargestWagers = (state: GameStateType): number[] => {
 	return largestWagers;
 };
 
-export let getLargestWagerAmount = (state: GameStateType): number => {
+export let getLargestWager = (
+	state: GameStateType,
+): PlayerIncreaseWagerType | null => {
 	let wagers = getWagers(state);
-	if (wagers.length === 0) return 0;
+	if (wagers.length === 0) return null;
 	return wagers.reduce((acc, curr) => {
-		if (curr.amount > acc) return curr.amount;
+		if (curr.amount > acc.amount) return curr;
 		return acc;
-	}, 0);
+	});
 };
 
-export let remainingStacks = (state: GameStateType): StackType[] => {
+export let getLargestWagerAmount = (state: GameStateType): number => {
+	return getLargestWager(state)?.amount ?? 0;
+};
+
+export let getRemainingStacks = (state: GameStateType): StackType[] => {
 	let currRound = getCurrentRound(state);
 	let stacksAtStart = getStacksAtStartOfRound(state)[currRound];
 	let largestWager = getLargestWagers(state);
@@ -327,7 +338,7 @@ export let getMaxBet = (state: GameStateType): number => {
 	let currSeat = getSeatOrder(state).at(0);
 	if (currSeat === undefined) throw 'No seats found';
 
-	let maxBet = remainingStacks(state).at(currSeat);
+	let maxBet = getRemainingStacks(state).at(currSeat);
 	if (maxBet === undefined) throw 'No stack found';
 
 	if (maxBet === 'unknown') return getLargestStack(state);
@@ -339,17 +350,156 @@ export let getMaxBet = (state: GameStateType): number => {
 	Get the min and max bet for the player with the current action
 */
 export let getMinMaxBet = (state: GameStateType): [number, number] => {
-	return [getMinBet(state), getMaxBet(state)];
+	let minBet = getMinBet(state);
+	let maxBet = getMaxBet(state);
+	// not able to make a full open
+	if (minBet > maxBet) return [maxBet, maxBet];
+	return [minBet, maxBet];
 };
 
 export let hasNonBlindAction = (state: GameStateType): boolean => {
-	return state.actionList.filter((a) => a.action !== 'blind').length > 0;
+	return (
+		state.actionList.filter(
+			(a) => a.action !== 'blind' && a.action !== 'preflop',
+		).length > 0
+	);
 };
 
 export let hasNonBlindStraddleAction = (state: GameStateType): boolean => {
 	return (
 		state.actionList.filter(
-			(a) => a.action !== 'blind' && a.action !== 'straddle',
+			(a) =>
+				a.action !== 'blind' &&
+				a.action !== 'straddle' &&
+				a.action !== 'preflop',
 		).length > 0
 	);
+};
+
+// Returns true if the current round is complete
+// IE: The bets are not matched by all players/all checked
+export let actionComplete = (state: GameStateType): boolean => {
+	if (state.actionList.length <= 1) return false;
+
+	let playerActions = playerActionsCurrentRound(state);
+	let seats = getSeatsAtThisRoundStart(state);
+	let largestWager = getLargestWagerAmount(state);
+
+	// no bets, ensure everyone has acted (checked or folded)
+	// and it isnt preflop
+	if (largestWager === 0 && getBlindsStraddles(state).length === 0) {
+		return playerActions.length < seats.length;
+	}
+
+	//preflop blind/straddle edge case
+	if (getCurrentRound(state) === 'preflop' && getBets(state).length === 0) {
+		return (
+			playerActions.length === seats.length + getBlindsStraddles(state).length
+		);
+	}
+
+	// Here we know someone has bet
+	// Now we need to check that everyone else has matched the bet with a call or folded
+	let seatsToAct = structuredClone(seats);
+	let largestBetAction: null | PlayerBetType = null;
+	for (let i = 0; i < playerActions.length; i++) {
+		let currAction = playerActions[i];
+		if (currAction.action === 'fold') {
+			seatsToAct = seatsToAct.filter((seat) => seat !== currAction.seat);
+			continue;
+		}
+		if (currAction.action === 'bet') {
+			if (
+				largestBetAction === null ||
+				currAction.amount > largestBetAction.amount
+			) {
+				largestBetAction = currAction;
+			}
+		}
+		seatsToAct = cycleSeats(seatsToAct);
+	}
+
+	return seatsToAct[0] === largestBetAction?.seat;
+};
+
+export let numPlayersNotFolded = (state: GameStateType): number => {
+	let playerActions = playerActionsCurrentRound(state);
+	let seats = getSeatsAtThisRoundStart(state);
+	playerActions.forEach((action) => {
+		if (action.action === 'fold') {
+			seats = seats.filter((seat) => seat !== action.seat);
+		}
+	});
+	return seats.length;
+};
+
+export let getSeatActions = (
+	state: GameStateType,
+): Record<number, PlayerActionType[]> => {
+	let playerActions = playerActionsCurrentRound(state);
+	let seatActions: Record<number, PlayerActionType[]> = {};
+	for (let i = 0; i < state.players.length; i++) seatActions[i] = [];
+	playerActions.forEach((action) => {
+		seatActions[action.seat].push(action);
+	});
+	return seatActions;
+};
+
+export let validateAction = (
+	state: GameStateType,
+	nextAction: ActionType,
+): boolean | string => {
+	let options = next(state);
+	if (options.length < 1)
+		return `There are less than one options (${options.length})`;
+	if (isDealerAction(nextAction) && isDealerOptions(options)) {
+		if (options.length > 1) return 'Dealer Options must only be length 1';
+		return options[0].action === nextAction.action;
+	}
+	if (isPlayerAction(nextAction) && isPlayerOptions(options)) {
+		let option = options.find((o) => o.action === nextAction.action);
+		if (option === undefined)
+			return `nextAction ${
+				nextAction.action
+			} not in options ${optionArrayToString(options)}`;
+
+		if (option.seat !== nextAction.seat)
+			return `Seat ${nextAction.seat} does not match option seat ${option.seat}`;
+
+		// fold, check, blind, straddle are valid on their own
+		if (
+			nextAction.action === 'fold' ||
+			nextAction.action === 'check' ||
+			nextAction.action === 'straddle' ||
+			nextAction.action === 'blind'
+		)
+			return true;
+
+		// call
+		if (nextAction.action === 'call' && option.action === 'call') {
+			if (nextAction.amount === option.amount) return true;
+			return `Call amount ${nextAction.amount} does not match option amount ${option.amount}`;
+		}
+
+		// bet
+		if (nextAction.action === 'bet' && option.action === 'bet') {
+			if (option.min === 'unknown' || option.max === 'unknown') return true;
+			if (nextAction.amount >= option.min && nextAction.amount <= option.max)
+				return true;
+			return `Bet amount ${nextAction.amount} not in range ${option.min} - ${option.max}`;
+		}
+	}
+
+	return 'Something went wrong';
+};
+
+export let validateState = (state: GameStateType): boolean | string => {
+	for (let i = 0; i < state.actionList.length; i++) {
+		let prevState = structuredClone(state);
+		prevState.actionList = state.actionList.slice(0, i);
+		let nextAction = state.actionList[i];
+		let valid = validateAction(prevState, nextAction);
+		if (valid !== true) return `Invalid action at index ${i}: ${valid}`;
+	}
+	return true;
 };
