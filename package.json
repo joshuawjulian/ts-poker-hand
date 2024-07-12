@@ -1,4 +1,5 @@
 {
+	"name": "ts-poker-hand",
 	"type": "module",
 	"devDependencies": {
 		"@tsconfig/recommended": "^1.0.6",

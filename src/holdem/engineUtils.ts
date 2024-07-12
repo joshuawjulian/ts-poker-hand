@@ -454,7 +454,10 @@ export let validateAction = (
 		return `There are less than one options (${options.length})`;
 	if (isDealerAction(nextAction) && isDealerOptions(options)) {
 		if (options.length > 1) return 'Dealer Options must only be length 1';
-		return options[0].action === nextAction.action;
+		if (options[0].action !== nextAction.action) {
+			return `Dealer action '${nextAction.action}' does not match option '${options[0].action}'`;
+		}
+		return true;
 	}
 	if (isPlayerAction(nextAction) && isPlayerOptions(options)) {
 		let option = options.find((o) => o.action === nextAction.action);
